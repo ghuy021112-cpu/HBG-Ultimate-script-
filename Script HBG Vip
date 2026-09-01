@@ -1,0 +1,246 @@
+-- HBG Loader V2 - Ultimate
+-- by Huy Báo Game
+-- Key: huybáogame1234567890123456
+
+local _ENV = (getgenv or getrenv or getfenv)()
+local BETA_VERSION = BETA_VERSION or _ENV.BETA_VERSION
+
+-- ============================================
+-- DANH SÁCH GAME & SCRIPT (ẨN)
+-- ============================================
+local HBG_Scripts = {
+    -- Blox Fruits
+    {
+        GameId = 994732206,
+        UrlPath = BETA_VERSION and "BLOX-FRUITS-BETA.lua" or "BloxFruits.luau",
+        Name = "Blox Fruits",
+    },
+    -- Meme Sea
+    {
+        PlacesIds = {10260193230},
+        UrlPath = "MemeSea.luau",
+        Name = "Meme Sea",
+    },
+    -- Thêm game khác nếu cần
+}
+
+-- ============================================
+-- CẤU HÌNH URL (ẨN)
+-- ============================================
+local HBG_Urls = {}
+HBG_Urls.Owner = "https://raw.githubusercontent.com/tlredz/"
+HBG_Urls.Repository = HBG_Urls.Owner .. "Scripts/refs/heads/main/"
+HBG_Urls.Translator = HBG_Urls.Repository .. "Translator/"
+HBG_Urls.Utils = HBG_Urls.Repository .. "Utils/"
+HBG_Urls.Games = HBG_Urls.Repository .. "Games/"
+
+-- ============================================
+-- HBG FETCHER (NÂNG CẤP)
+-- ============================================
+local HBG_Fetcher = {
+    cache = {},
+    _ENV = _ENV,
+}
+
+-- Format URL
+local function HBG_formatUrl(Url)
+    local formatted = Url
+    for key, path in pairs(HBG_Urls) do
+        if type(path) == "string" then
+            formatted = formatted:gsub("{" .. key .. "}", path)
+        end
+    end
+    return formatted
+end
+
+-- GET với retry
+function HBG_Fetcher.get(Url, retries)
+    retries = retries or 3
+    local lastError = nil
+    
+    for i = 1, retries do
+        local success, response = pcall(function()
+            return game:HttpGet(HBG_formatUrl(Url))
+        end)
+        
+        if success then
+            HBG_Fetcher.cache[Url] = response
+            return response
+        else
+            lastError = response
+            task.wait(0.5 * i)
+        end
+    end
+    
+    error(string.format("[HBG] Failed to load: %s\nError: %s", Url, tostring(lastError)))
+end
+
+-- Load script
+function HBG_Fetcher.load(Url, concat)
+    local raw = HBG_Fetcher.get(Url)
+    if concat then
+        raw = raw .. concat
+    end
+    
+    local runFunction, errorText = loadstring(raw)
+    if type(runFunction) ~= "function" then
+        error(string.format("[HBG] Syntax error in: %s\nError: %s", Url, tostring(errorText)))
+    end
+    
+    return runFunction
+end
+
+-- ============================================
+-- EXECUTOR DETECTION (ẨN)
+-- ============================================
+local function HBG_getExecutor()
+    local executors = {
+        {name = "Synapse X", check = function() return syn and syn.request end},
+        {name = "Krnl", check = function() return KRNL_LOADED end},
+        {name = "Fluxus", check = function() return fluxus and fluxus.request end},
+        {name = "Delta", check = function() return delta and delta.request end},
+        {name = "Script-Ware", check = function() return scriptware end},
+        {name = "Vega X", check = function() return VegaX and VegaX.execute end},
+        {name = "Hydrogen", check = function() return Hydrogen and Hydrogen.execute end},
+        {name = "Unknown", check = function() return true end},
+    }
+    
+    for _, exec in ipairs(executors) do
+        if exec.check() then
+            return exec.name
+        end
+    end
+    return "Unknown"
+end
+
+-- ============================================
+-- TELEPORT QUEUE (ẨN)
+-- ============================================
+local function HBG_setupQueue(...)
+    local executor = syn or fluxus or delta
+    local queueteleport = queue_on_teleport or (executor and executor.queue_on_teleport)
+    
+    if not _ENV.HBG_queued and type(queueteleport) == "function" then
+        _ENV.HBG_queued = true
+        
+        local ScriptSettings = {...}
+        local SettingsCode = ""
+        
+        local Success, EncodedSettings = pcall(function()
+            return game:GetService("HttpService"):JSONEncode(ScriptSettings)
+        end)
+        
+        if Success and EncodedSettings then
+            SettingsCode = "unpack(game:GetService('HttpService'):JSONDecode('" .. EncodedSettings .. "'))"
+        end
+        
+        local SourceCode = ("loadstring(game:HttpGet('%smain.luau'))(%s)"):format(HBG_Urls.Repository, SettingsCode)
+        
+        if BETA_VERSION then
+            SourceCode = "getgenv().BETA_VERSION=true;" .. SourceCode
+        end
+        
+        pcall(queueteleport, SourceCode)
+        print("✅ HBG Queue added!")
+    end
+end
+
+-- ============================================
+-- GAME DETECTION (ẨN)
+-- ============================================
+local function HBG_isGameMatch(Script)
+    if Script.PlacesIds and table.find(Script.PlacesIds, game.PlaceId) then
+        return true
+    elseif Script.GameId and Script.GameId == game.GameId then
+        return true
+    end
+    return false
+end
+
+local function HBG_getGameInfo()
+    local placeId = game.PlaceId
+    local gameId = game.GameId
+    
+    for _, Script in ipairs(HBG_Scripts) do
+        if HBG_isGameMatch(Script) then
+            return Script, placeId, gameId
+        end
+    end
+    return nil, placeId, gameId
+end
+
+-- ============================================
+-- ERROR HANDLER (ẨN)
+-- ============================================
+local function HBG_handleError(Text)
+    _ENV.loadedFarm = nil
+    _ENV.OnFarm = false
+    
+    local executorName = HBG_getExecutor()
+    local errorMsg = string.format("[HBG] %s: %s", executorName, Text)
+    
+    pcall(function()
+        local Message = Instance.new("Message", workspace)
+        Message.Text = "HBG Error: " .. Text
+        _ENV.HBG_error_msg = Message
+        task.wait(10)
+        Message:Destroy()
+    end)
+    
+    error(errorMsg, 2)
+end
+
+-- ============================================
+-- LOAD SCRIPT CHÍNH (ẨN)
+-- ============================================
+local function HBG_loadMain()
+    local Script, placeId, gameId = HBG_getGameInfo()
+    
+    if not Script then
+        error(string.format("[HBG] No script for GameId: %d, PlaceId: %d", gameId, placeId))
+    end
+    
+    print(string.format("🎮 HBG: %s (GameId: %d)", Script.Name or "Unknown", gameId))
+    
+    local url = HBG_Urls.Games .. Script.UrlPath
+    print("📥 HBG Loading: " .. url)
+    
+    local scriptFunction = HBG_Fetcher.load(url)
+    return scriptFunction(HBG_Fetcher, ...)
+end
+
+-- ============================================
+-- SETUP VÀ CHẠY (ẨN)
+-- ============================================
+
+-- Debounce
+local last_exec = _ENV.HBG_last_exec
+if last_exec and (tick() - last_exec) <= 5 then
+    print("⏳ HBG: Already running...")
+    return nil
+end
+_ENV.HBG_last_exec = tick()
+
+-- Setup teleport queue
+HBG_setupQueue(...)
+
+-- Load script
+local success, result = pcall(HBG_loadMain)
+
+if success then
+    print("✅ HBG Loaded successfully!")
+    print("📌 by Huy Báo Game Pro")
+else
+    HBG_handleError(tostring(result))
+end
+
+-- ============================================
+-- EXPOSE API (ẨN)
+-- ============================================
+return {
+    fetch = HBG_Fetcher,
+    urls = HBG_Urls,
+    scripts = HBG_Scripts,
+    getGame = HBG_getGameInfo,
+    getExec = HBG_getExecutor,
+}
