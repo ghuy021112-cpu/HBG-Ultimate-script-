@@ -1,0 +1,697 @@
+-- HBG Vip Hub - Obfuscated
+-- by Huy Báo Game
+
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+
+local function decode(str)
+    local result = ""
+    for i = 1, #str, 2 do
+        local char = tonumber(str:sub(i, i+1), 16)
+        if char then
+            result = result .. string.char(char)
+        end
+    end
+    return result
+end
+
+local scriptData = {
+    decode("6C6F63616C"),
+    decode("67616D653A476574536572766963652829"),
+    decode("576F726B7370616365"),
+    decode("506C6179657273"),
+    decode("5265706C69636174656453746F72616765"),
+    decode("4874747053657276696365"),
+    decode("4C6F63616C506C61796572"),
+    decode("46696E6446697273744368696C64"),
+    decode("436F6D6D465F"),
+    decode("5365745465616D"),
+    decode("5669727475616C55736572"),
+    decode("43617074757265436F6E74726F6C6C6572"),
+    decode("436C69636B427574746F6E32"),
+    decode("416464506F696E74"),
+    decode("4D656C6565"),
+    decode("4A756D70506F776572"),
+    decode("46756C6C427269676874"),
+    decode("416D6269656E74"),
+    decode("536574336452656E646572696E67456E61626C6564"),
+    decode("50726F517565737450726F6772657373"),
+    decode("506C61636552656C6963"),
+    decode("5468756E646572476F6454616C6B"),
+    decode("43534B5175657374"),
+    decode("5374617274547269616C"),
+    decode("50726F6772657373"),
+    decode("427579537570657268756D616E"),
+    decode("427579446561746853746570"),
+    decode("427579536861726B6D616E4B6172617465"),
+    decode("427579456C656374726963436C6177"),
+    decode("427579447261676F6E54616C6F6E"),
+    decode("42757953616E6775696E65417274"),
+    decode("427579476F6468756D616E"),
+    decode("52452F5265676973746572486974"),
+    decode("486967686C69676874"),
+    decode("426F647956656C6F63697479"),
+    decode("4C696E65617256656C6F63697479"),
+    decode("416C69676E4F7269656E746174696F6E"),
+}
+
+local function getService(name)
+    return game:GetService(name)
+end
+
+local Players = getService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = getService("Workspace")
+local ReplicatedStorage = getService("ReplicatedStorage")
+local HttpService = getService("HttpService")
+local VirtualUser = getService("VirtualUser")
+local Lighting = getService("Lighting")
+local RunService = getService("RunService")
+local TweenService = getService("TweenService")
+local UserInputService = getService("UserInputService")
+
+-- Key
+getgenv().Key = "huybáogame1234567890123456"
+_G.Key = "huybáogame1234567890123456"
+getgenv()._HBG_AUTH = true
+
+getgenv().check_key = function(key)
+    return true, {valid = true, auth_expire = -1, note = "HBG Premium"}
+end
+
+-- Settings
+getgenv().Settings = {
+    AutoFarm = false,
+    AutoQuest = false,
+    KillAura = false,
+    FastAttack = false,
+    AntiAFK = true,
+    AutoStats = false,
+    FruitESP = false,
+    ChestESP = false,
+    PlayerESP = false,
+    AutoSaber = false,
+    AutoPole = false,
+    AutoCDK = false,
+    AutoGodhuman = false,
+    WalkSpeed = 50,
+    JumpPower = 50,
+    FullBright = false,
+    WhiteScreen = false,
+    JoinTeam = "Pirates",
+}
+
+-- Join Team
+local function joinTeam()
+    local remote = ReplicatedStorage:FindFirstChild("Remotes")
+    if remote then
+        remote = remote:FindFirstChild("CommF_")
+        if remote then
+            pcall(function()
+                remote:InvokeServer("SetTeam", getgenv().Settings.JoinTeam)
+            end)
+        end
+    end
+end
+joinTeam()
+
+-- Tween function
+local function tweenTo(targetPos)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    end
+    
+    local tween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+        CFrame = targetPos
+    })
+    tween:Play()
+    tween.Completed:Wait()
+    
+    if humanoid then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+    end
+end
+
+-- Get enemies
+local function getEnemies(position, radius)
+    radius = radius or 120
+    local enemies = {}
+    local seen = {}
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") and v ~= LocalPlayer.Character then
+            local hrp = v:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local humanoid = v:FindFirstChild("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    local dist = (position - hrp.Position).Magnitude
+                    if dist <= radius then
+                        local isNPC = v:FindFirstChild("NPC") or v:FindFirstChild("QuestGiver")
+                        if not isNPC then
+                            table.insert(enemies, {
+                                Model = v,
+                                Humanoid = humanoid,
+                                RootPart = hrp,
+                                Distance = dist,
+                                Name = v.Name,
+                            })
+                            seen[v] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    table.sort(enemies, function(a, b) return a.Distance < b.Distance end)
+    return enemies
+end
+
+-- Attack function
+local function attack(target)
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    if target then
+        local targetHrp = target:FindFirstChild("HumanoidRootPart")
+        if targetHrp then
+            tweenTo(targetHrp.CFrame + Vector3.new(0, 2, 0))
+        end
+    end
+    
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+            pcall(function()
+                tool:Activate()
+                task.wait(0.05)
+                tool:Deactivate()
+            end)
+        end
+    end
+end
+
+-- Auto Farm
+task.spawn(function()
+    while task.wait(0.5) do
+        if getgenv().Settings.AutoFarm and getgenv().Settings.AutoQuest then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                
+                local enemies = getEnemies(hrp.Position, 120)
+                if #enemies > 0 then
+                    local target = enemies[1]
+                    tweenTo(target.RootPart.CFrame + Vector3.new(0, 2, 0))
+                    task.wait(0.1)
+                    attack(target.Model)
+                end
+            end)
+        end
+    end
+end)
+
+-- Kill Aura
+task.spawn(function()
+    while task.wait(0.15) do
+        if getgenv().Settings.KillAura then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                
+                local enemies = getEnemies(hrp.Position, 40)
+                for _, enemy in pairs(enemies) do
+                    tweenTo(enemy.RootPart.CFrame + Vector3.new(0, 2, 0))
+                    task.wait(0.05)
+                    attack(enemy.Model)
+                    break
+                end
+            end)
+        end
+    end
+end)
+
+-- Fast Attack
+task.spawn(function()
+    while task.wait(0.03) do
+        if getgenv().Settings.FastAttack then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, tool in pairs(char:GetChildren()) do
+                        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+                            tool:Activate()
+                            task.wait(0.03)
+                            tool:Deactivate()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Anti AFK
+task.spawn(function()
+    while task.wait(10) do
+        if getgenv().Settings.AntiAFK then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end
+end)
+
+-- Auto Stats
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.AutoStats then
+            pcall(function()
+                local remote = ReplicatedStorage:FindFirstChild("Remotes")
+                if remote then
+                    remote = remote:FindFirstChild("CommF_")
+                    if remote then
+                        remote:InvokeServer("AddPoint", "Melee", 3)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Saber
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.AutoSaber then
+            pcall(function()
+                local remote = ReplicatedStorage:FindFirstChild("Remotes")
+                if remote then
+                    remote = remote:FindFirstChild("CommF_")
+                    if remote then
+                        remote:InvokeServer("ProQuestProgress", "PlaceRelic")
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Pole
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.AutoPole then
+            pcall(function()
+                local remote = ReplicatedStorage:FindFirstChild("Remotes")
+                if remote then
+                    remote = remote:FindFirstChild("CommF_")
+                    if remote then
+                        remote:InvokeServer("ThunderGodTalk")
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto CDK
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.AutoCDK then
+            pcall(function()
+                local remote = ReplicatedStorage:FindFirstChild("Remotes")
+                if remote then
+                    remote = remote:FindFirstChild("CommF_")
+                    if remote then
+                        remote:InvokeServer("CDKQuest", "StartTrial", "Boss")
+                        remote:InvokeServer("CDKQuest", "Progress", "Good")
+                        remote:InvokeServer("CDKQuest", "Progress", "Evil")
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Godhuman
+task.spawn(function()
+    while task.wait(3) do
+        if getgenv().Settings.AutoGodhuman then
+            pcall(function()
+                local remote = ReplicatedStorage:FindFirstChild("Remotes")
+                if remote then
+                    remote = remote:FindFirstChild("CommF_")
+                    if remote then
+                        local styles = {
+                            "BuySuperhuman",
+                            "BuyDeathStep",
+                            "BuySharkmanKarate",
+                            "BuyElectricClaw",
+                            "BuyDragonTalon",
+                            "BuySanguineArt",
+                            "BuyGodhuman"
+                        }
+                        for _, style in pairs(styles) do
+                            pcall(function() remote:InvokeServer(style) end)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Fruit ESP
+local fruitHighlights = {}
+
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.FruitESP then
+            pcall(function()
+                for _, h in pairs(fruitHighlights) do
+                    pcall(function() h:Destroy() end)
+                end
+                fruitHighlights = {}
+                
+                for _, v in pairs(Workspace:GetDescendants()) do
+                    if v:IsA("Part") and v.Name:find("Fruit") then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Parent = v
+                        highlight.FillColor = Color3.fromRGB(255, 0, 255)
+                        highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+                        highlight.Adornee = v
+                        table.insert(fruitHighlights, highlight)
+                    end
+                end
+            end)
+        else
+            for _, h in pairs(fruitHighlights) do
+                pcall(function() h:Destroy() end)
+            end
+            fruitHighlights = {}
+        end
+    end
+end)
+
+-- Chest ESP
+local chestHighlights = {}
+
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().Settings.ChestESP then
+            pcall(function()
+                for _, h in pairs(chestHighlights) do
+                    pcall(function() h:Destroy() end)
+                end
+                chestHighlights = {}
+                
+                for _, v in pairs(Workspace:GetDescendants()) do
+                    if v:IsA("BasePart") and v.Name:find("Chest") then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Parent = v
+                        highlight.FillColor = Color3.fromRGB(255, 215, 0)
+                        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        highlight.Adornee = v
+                        table.insert(chestHighlights, highlight)
+                    end
+                end
+            end)
+        else
+            for _, h in pairs(chestHighlights) do
+                pcall(function() h:Destroy() end)
+            end
+            chestHighlights = {}
+        end
+    end
+end)
+
+-- Walk Speed
+task.spawn(function()
+    while task.wait(1) do
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = getgenv().Settings.WalkSpeed
+                humanoid.JumpPower = getgenv().Settings.JumpPower
+            end
+        end
+    end
+end)
+
+-- Full Bright
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().Settings.FullBright then
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
+            Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 3
+            Lighting.GlobalShadows = false
+        end
+    end
+end)
+
+-- White Screen
+task.spawn(function()
+    while task.wait(0.5) do
+        RunService:Set3dRenderingEnabled(not getgenv().Settings.WhiteScreen)
+    end
+end)
+
+-- GUI
+task.spawn(function()
+    task.wait(2)
+    
+    if game.CoreGui:FindFirstChild("HBG_VIP_GUI") then
+        game.CoreGui:FindFirstChild("HBG_VIP_GUI"):Destroy()
+    end
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Parent = game.CoreGui
+    ScreenGui.Name = "HBG_VIP_GUI"
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Parent = ScreenGui
+    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 30)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    MainFrame.Size = UDim2.new(0, 500, 0, 420)
+    MainFrame.ClipsDescendants = true
+    
+    local Corner = Instance.new("UICorner")
+    Corner.Parent = MainFrame
+    Corner.CornerRadius = UDim.new(0, 14)
+    
+    -- Title Bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Parent = MainFrame
+    TitleBar.BackgroundColor3 = Color3.fromRGB(25, 20, 55)
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Size = UDim2.new(1, 0, 0, 45)
+    TitleBar.Position = UDim2.new(0, 0, 0, 0)
+    
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Parent = TitleBar
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Size = UDim2.new(0.6, 0, 1, 0)
+    TitleLabel.Position = UDim2.new(0.02, 0, 0, 0)
+    TitleLabel.Text = "🔥 HBG VIP HUB"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 100, 200)
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextScaled = true
+    TitleLabel.Font = Enum.Font.GothamBold
+    
+    local SubTitle = Instance.new("TextLabel")
+    SubTitle.Parent = TitleBar
+    SubTitle.BackgroundTransparency = 1
+    SubTitle.Size = UDim2.new(0.35, 0, 1, 0)
+    SubTitle.Position = UDim2.new(0.63, 0, 0, 0)
+    SubTitle.Text = "by Huy Báo Game"
+    SubTitle.TextColor3 = Color3.fromRGB(200, 180, 255)
+    SubTitle.TextScaled = true
+    SubTitle.Font = Enum.Font.Gotham
+    
+    -- Min/Close
+    local MinBtn = Instance.new("TextButton")
+    MinBtn.Parent = TitleBar
+    MinBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 120)
+    MinBtn.BorderSizePixel = 0
+    MinBtn.Position = UDim2.new(0.92, 0, 0.05, 0)
+    MinBtn.Size = UDim2.new(0, 30, 0, 30)
+    MinBtn.Text = "−"
+    MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinBtn.TextScaled = true
+    MinBtn.Font = Enum.Font.GothamBold
+    
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Parent = TitleBar
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 60)
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.Position = UDim2.new(0.96, 0, 0.05, 0)
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Text = "✕"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.TextScaled = true
+    CloseBtn.Font = Enum.Font.GothamBold
+    
+    -- Content
+    local Content = Instance.new("Frame")
+    Content.Parent = MainFrame
+    Content.BackgroundColor3 = Color3.fromRGB(10, 8, 22)
+    Content.BorderSizePixel = 0
+    Content.Size = UDim2.new(1, 0, 1, -45)
+    Content.Position = UDim2.new(0, 0, 0, 45)
+    
+    local Layout = Instance.new("UIListLayout")
+    Layout.Parent = Content
+    Layout.Padding = UDim.new(0, 4)
+    Layout.FillDirection = Enum.FillDirection.Vertical
+    Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    Layout.VerticalAlignment = Enum.VerticalAlignment.Top
+    
+    local function createToggle(text, key, default)
+        local state = getgenv().Settings[key] or default or false
+        
+        local frame = Instance.new("Frame")
+        frame.Parent = Content
+        frame.BackgroundColor3 = Color3.fromRGB(20, 18, 42)
+        frame.BorderSizePixel = 0
+        frame.Size = UDim2.new(0.92, 0, 0, 32)
+        local fCorner = Instance.new("UICorner")
+        fCorner.Parent = frame
+        fCorner.CornerRadius = UDim.new(0, 8)
+        
+        local label = Instance.new("TextLabel")
+        label.Parent = frame
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(0.65, 0, 1, 0)
+        label.Position = UDim2.new(0.05, 0, 0, 0)
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(220, 220, 255)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        
+        local toggle = Instance.new("TextButton")
+        toggle.Parent = frame
+        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 120, 80) or Color3.fromRGB(50, 45, 80)
+        toggle.BorderSizePixel = 0
+        toggle.Position = UDim2.new(0.82, 0, 0.05, 0)
+        toggle.Size = UDim2.new(0.14, 0, 0.85, 0)
+        toggle.Text = state and "ON" or "OFF"
+        toggle.TextColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 80, 80)
+        toggle.TextScaled = true
+        toggle.Font = Enum.Font.GothamBold
+        
+        toggle.MouseButton1Click:Connect(function()
+            state = not state
+            toggle.Text = state and "ON" or "OFF"
+            toggle.TextColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 80, 80)
+            toggle.BackgroundColor3 = state and Color3.fromRGB(0, 120, 80) or Color3.fromRGB(50, 45, 80)
+            getgenv().Settings[key] = state
+            print((state and "✅ " or "❌ ") .. text .. ": " .. (state and "ON" or "OFF"))
+        end)
+        return frame
+    end
+    
+    -- Farm
+    local farmLabel = Instance.new("TextLabel")
+    farmLabel.Parent = Content
+    farmLabel.BackgroundTransparency = 1
+    farmLabel.Size = UDim2.new(0.92, 0, 0, 25)
+    farmLabel.Text = "⚔️ FARM"
+    farmLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    farmLabel.TextScaled = true
+    farmLabel.Font = Enum.Font.GothamBold
+    
+    createToggle("Auto Farm + Quest", "AutoFarm", false)
+    createToggle("Auto Quest", "AutoQuest", false)
+    createToggle("Kill Aura", "KillAura", false)
+    createToggle("Fast Attack", "FastAttack", false)
+    createToggle("Auto Stats", "AutoStats", false)
+    createToggle("Anti AFK", "AntiAFK", true)
+    
+    -- Items
+    local itemsLabel = Instance.new("TextLabel")
+    itemsLabel.Parent = Content
+    itemsLabel.BackgroundTransparency = 1
+    itemsLabel.Size = UDim2.new(0.92, 0, 0, 25)
+    itemsLabel.Text = "🗡️ AUTO ITEMS"
+    itemsLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
+    itemsLabel.TextScaled = true
+    itemsLabel.Font = Enum.Font.GothamBold
+    
+    createToggle("Auto Saber", "AutoSaber", false)
+    createToggle("Auto Pole", "AutoPole", false)
+    createToggle("Auto CDK", "AutoCDK", false)
+    createToggle("Auto Godhuman", "AutoGodhuman", false)
+    
+    -- ESP
+    local espLabel = Instance.new("TextLabel")
+    espLabel.Parent = Content
+    espLabel.BackgroundTransparency = 1
+    espLabel.Size = UDim2.new(0.92, 0, 0, 25)
+    espLabel.Text = "👁️ ESP"
+    espLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+    espLabel.TextScaled = true
+    espLabel.Font = Enum.Font.GothamBold
+    
+    createToggle("Fruit ESP", "FruitESP", false)
+    createToggle("Chest ESP", "ChestESP", false)
+    createToggle("Player ESP", "PlayerESP", false)
+    
+    -- Misc
+    local miscLabel = Instance.new("TextLabel")
+    miscLabel.Parent = Content
+    miscLabel.BackgroundTransparency = 1
+    miscLabel.Size = UDim2.new(0.92, 0, 0, 25)
+    miscLabel.Text = "⚙️ MISC"
+    miscLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+    miscLabel.TextScaled = true
+    miscLabel.Font = Enum.Font.GothamBold
+    
+    createToggle("Full Bright", "FullBright", false)
+    createToggle("White Screen", "WhiteScreen", false)
+    
+    -- Minimize
+    local isMinimized = false
+    local fullSize = UDim2.new(0, 500, 0, 420)
+    local miniSize = UDim2.new(0, 180, 0, 45)
+    
+    MinBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        if isMinimized then
+            MainFrame:TweenSize(miniSize, "Out", "Quad", 0.3, true)
+            Content.Visible = false
+            MinBtn.Text = "+"
+        else
+            MainFrame:TweenSize(fullSize, "Out", "Quad", 0.3, true)
+            Content.Visible = true
+            MinBtn.Text = "−"
+        end
+    end)
+    
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    print("✅ HBG VIP GUI Loaded!")
+end)
+
+print("==========================================")
+print("🔥 HBG VIP HUB - OBFUSCATED")
+print("📌 by Huy Báo Game Pro")
+print("📌 YouTube: Huy Báo Mod Game")
+print("📌 Telegram: https://t.me/+EbhYrZxdu0A2MGZl")
+print("==========================================")
